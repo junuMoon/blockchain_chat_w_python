@@ -3,6 +3,9 @@
 .webassets-cache
 .env
 
+### static source
+starlight/
+
 ### Flask.Python Stack ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

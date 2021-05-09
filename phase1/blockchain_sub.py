@@ -84,6 +84,5 @@ class Blockchain:
     def last_block(self):
         return self.chain[-1]
     
-
 blockchain = Blockchain()
 blockchain.new_block()

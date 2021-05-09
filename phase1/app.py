@@ -1,5 +1,6 @@
-from flask import Flask
+from flask import Flask, request
 from flask.templating import render_template
+from werkzeug.utils import redirect
 
 from .blockchain import Blockchain
 
@@ -11,30 +12,28 @@ blockchain = Blockchain()
 
 @app.route('/', methods=["GET", "POST"])
 def index():
+    sessions = request.post('/nodes/register')
     return render_template('index.html')
 
 
-@app.route('/mine', methods=["GET", "POST"])
+@app.route('/blocks/{hash}', method=['get'])
+def index():
+    return render_template('index.html')
+
+
+@app.route('blocks/mine', methods=["GET"])
 def mine():
-    return
+    return redirect('blocks', block_hash='new_block_hash')
 
 
-@app.route('/transactions/new', methods=["GET", "POST"])
-def new_transaction():
-    return
+@app.route('/transactions/new', methods=["POST"])
+def submit_transaction():
+    redirect('blocks', block_hash='selected_block_hash')
 
 
-@app.route('/transactions/', methods=["GET", "POST"])
-def get_transactions():
-    return
-
-
-@app.route('/nodes/register', methods=["GET", "POST"])
+@app.route('/nodes/register', methods=["GET"])
 def node_register():
-    return
+    return redirect('home')
 
 
-@app.route('/nodes/resolve', methods=["GET", "POST"])
-def node_resolve():
-    return
 
