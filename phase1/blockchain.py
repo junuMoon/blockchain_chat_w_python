@@ -1,6 +1,6 @@
 import hashlib
 import json
-
+from Crypto.PublicKey import RSA
 
 class Transaction:
     INDEX = 0
@@ -27,15 +27,16 @@ class Block:
 class Blockchain:
     
     DIFFICULTY = 4
+    FIRST_NONCE = 100
     
     def __init__(self):
-        self.nodes = set()
+        self.nodes = list()
         self.chain = list()
         self.current_transactions = list()
         
-        _hash, nonce = self.proof_of_work(100)
+        _, nonce = self._proof_of_work(self.FIRST_NONCE)
         genesis_block = Block(
-            previous_hash= _hash,
+            previous_hash= '',
             transactions=list(),
             nonce=nonce
         )
@@ -43,7 +44,7 @@ class Blockchain:
         self.chain.append(genesis_block)
         
     def new_block(self):
-        _hash, nonce = self.proof_of_work(self.last_block.__dict__)
+        _hash, nonce = self._proof_of_work(self.last_block.__dict__)
         block = Block(
             previous_hash = _hash,
             transactions = self.current_transactions,
@@ -56,24 +57,38 @@ class Blockchain:
         
         return block
         
-    def proof_of_work(self, msg):
+    def _proof_of_work(self, block):
         nonce = 0
         
         while True:
-            _hash = hashlib.sha256(f"{msg}{nonce}".encode()).hexdigest()
+            _hash = hashlib.sha256(f"{block}{nonce}".encode()).hexdigest()
             if _hash[:self.DIFFICULTY] == "0"*self.DIFFICULTY:
-                return _hash, nonce
                 break
             else:
                 nonce += 1
+        return _hash, nonce
                 
-    def new_transactions(self):
+    def new_transactions(self, sender_address, recipient_address, amount):
         tx = Transaction(
-            sender = input(),
-            recipient_address = input(),
-            amount = input()
+            sender = sender_address,
+            recipient_address = recipient_address,
+            amount = amount
         )
         Transaction.INDEX += 1
+        self.current_transactions.append(tx)
+        return tx
+        
+        
+    def new_node(self, nickname):
+        nickname = nickname
+        private_key = RSA.generate(2048)
+        public_key = private_key.public_key()
+        node = {
+            'name': nickname,
+            'private_key': private_key,
+            'public_key': public_key
+        }
+        self.nodes.append(node)
 
     @staticmethod
     def custom_hash(msg):
