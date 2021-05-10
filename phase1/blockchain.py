@@ -1,15 +1,27 @@
 import hashlib
+import binascii
 import json
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Signature import pkcs1_15
 from Crypto.PublicKey import RSA
 
+class Node:
+    INDEX = 0
+    
+    def __init__(self, nickname):
+        self.index = self.INDEX
+        self.nickname = nickname
+        self.private_key = RSA.generate(2048)
+        self.public_key = self.private_key.public_key()
+        
 class Transaction:
     INDEX = 0
     
-    def __init__(self, sender, recipient_address, amount):
+    def __init__(self, sender_address, recipient_address, amount):
         self.index = self.INDEX
         self.previous_hash = ''
         self.timestamp = '2020-04-10'
-        self.sender = sender
+        self.sender = sender_address
         self.recipient_address = recipient_address
         self.amount = amount
 
@@ -68,26 +80,27 @@ class Blockchain:
                 nonce += 1
         return _hash, nonce
                 
-    def new_transactions(self, sender_address, recipient_address, amount):
+    def new_transactions(self, sender, recipient_address, amount):
+        
+        signature = sender.public_key
+        
         tx = Transaction(
-            sender = sender_address,
-            recipient_address = recipient_address,
+            sender = sender.public_key,
+            recipient_address = recipient.public_key,
             amount = amount
         )
         Transaction.INDEX += 1
         self.current_transactions.append(tx)
         return tx
         
-        
+# 1. sender는 이전 tx를 recipient address를 넣고 asymmetric encryption로 잠군다. -> enc_msg
+# 2. sender priv key를 넣고 enc_msg에 digital signature를 남긴다.
+# 3. recipient는 sender의 public key를 넣고 digital signature가 진본임을 확인한다.
+# 4. recipient는 priv key로 tx을 푼다
     def new_node(self, nickname):
         nickname = nickname
-        private_key = RSA.generate(2048)
-        public_key = private_key.public_key()
-        node = {
-            'name': nickname,
-            'private_key': private_key,
-            'public_key': public_key
-        }
+        node = Node(nickname)
+        Node.INDEX += 1
         self.nodes.append(node)
 
     @staticmethod
