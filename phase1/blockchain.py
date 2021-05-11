@@ -1,8 +1,8 @@
 import hashlib
 import binascii
 import json
-from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
 class Node:
@@ -17,14 +17,32 @@ class Node:
 class Transaction:
     INDEX = 0
     
-    def __init__(self, sender_address, recipient_address, amount):
+    def __init__(self, sender, recipient_address, amount):
         self.index = self.INDEX
-        self.previous_hash = ''
         self.timestamp = '2020-04-10'
-        self.sender = sender_address
-        self.recipient_address = recipient_address
+        self.previous_hash = ''
+        self.tx_out = self.transaction_out(sender_address = binascii.hexlify(sender.public_key),
+                                   recipient_address = binascii.hexlify(recipient_address),
+                                   amount = amount)
+        self.signature = self.sign_transaction(sender, self.tx_out)
         self.amount = amount
-
+    
+    def transaction_out(self, sender_address, recipient_address, amount):
+        d = {
+            'sender_address': sender_address,
+            'recipient_address': recipient_address,
+            'amout': amount
+        }
+        return d
+        
+    def sign_transaction(self, sender, msg):
+        signer = pkcs1_15.new(sender.private_key)
+        msg = json.dumps(msg)
+        h = SHA256.new(msg.encode())
+        signature = signer.sign(h)
+        
+        return signature
+        
 class Block:
     INDEX = 0
     
@@ -80,28 +98,28 @@ class Blockchain:
                 nonce += 1
         return _hash, nonce
                 
-    def new_transactions(self, sender, recipient_address, amount):
-        
-        signature = sender.public_key
+    def new_transaction(self, sender, recipient_address, amount):
         
         tx = Transaction(
-            sender = sender.public_key,
-            recipient_address = recipient.public_key,
-            amount = amount
+            sender = sender, 
+            recipient_address = recipient_address,
+            amount = amount,
         )
         Transaction.INDEX += 1
         self.current_transactions.append(tx)
         return tx
         
-# 1. sender는 이전 tx를 recipient address를 넣고 asymmetric encryption로 잠군다. -> enc_msg
-# 2. sender priv key를 넣고 enc_msg에 digital signature를 남긴다.
-# 3. recipient는 sender의 public key를 넣고 digital signature가 진본임을 확인한다.
-# 4. recipient는 priv key로 tx을 푼다
+# 1. sender는 이전 tx을 해쉬에 넣어 previous_tx_hash를 만든다
+# 2. recipient address, amout를 적는다.
+# 3. sender priv key를 넣고 enc_msg에 digital signature를 남긴다.
+# 4. recipient는 sender의 public key를 넣고 digital signature가 진본임을 확인한다.
     def new_node(self, nickname):
         nickname = nickname
         node = Node(nickname)
         Node.INDEX += 1
         self.nodes.append(node)
+        
+        return node
 
     @staticmethod
     def custom_hash(msg):
@@ -114,4 +132,7 @@ class Blockchain:
     
 
 blockchain = Blockchain()
+junu = blockchain.new_node('junu')
+kim = blockchain.new_node('kim')
+blockchain.new_transaction(junu, kim.public_key, 3)
 blockchain.new_block()
