@@ -12,7 +12,7 @@ class Node:
         self.index = self.INDEX
         self.nickname = nickname
         self.private_key = RSA.generate(2048)
-        self.public_key = self.private_key.public_key()
+        self.public_key = self.private_key.public_key().export_key('OpenSSH')
         
 class Transaction:
     INDEX = 0
@@ -21,25 +21,26 @@ class Transaction:
         self.index = self.INDEX
         self.timestamp = '2020-04-10'
         self.previous_hash = ''
-        self.tx_out = self.transaction_out(sender_address = binascii.hexlify(sender.public_key),
-                                   recipient_address = binascii.hexlify(recipient_address),
-                                   amount = amount)
-        self.signature = self.sign_transaction(sender, self.tx_out)
+        self.sender_address = sender.public_key
+        self.recipient_address = recipient_address
         self.amount = amount
-    
-    def transaction_out(self, sender_address, recipient_address, amount):
-        d = {
-            'sender_address': sender_address,
-            'recipient_address': recipient_address,
-            'amout': amount
-        }
-        return d
+        self.signature = self.sign_transaction(sender)
         
-    def sign_transaction(self, sender, msg):
+    def sign_transaction(self, sender):
+        msg = {
+            'sender_address': self.sender_address.decode(),
+            'recipient_address': self.recipient_address.decode(),
+            'amount': self.amount
+        }
+        
         signer = pkcs1_15.new(sender.private_key)
         msg = json.dumps(msg)
         h = SHA256.new(msg.encode())
         signature = signer.sign(h)
+        key = RSA.import_key(sender.public_key)
+        verifier = pkcs1_15.new(key)
+        verification = verifier.verify(h, signature)
+        print(verification)
         
         return signature
         
@@ -97,6 +98,21 @@ class Blockchain:
             else:
                 nonce += 1
         return _hash, nonce
+    
+    def verify_transaction(self, transaction):
+        msg = {
+            'sender_address': transaction.sender_address.decode(),
+            'recipient_address': transaction.recipient_address.decode(),
+            'amount': transaction.amount
+        }
+        
+        key = RSA.import_key(msg.get('sender_address'))
+        verifier = pkcs1_15.new(key)
+        msg = json.dumps(msg)
+        h = SHA256.new(msg.encode())
+        verification = verifier.verify(h, transaction.signature)
+        
+        return verification
                 
     def new_transaction(self, sender, recipient_address, amount):
         
@@ -105,14 +121,16 @@ class Blockchain:
             recipient_address = recipient_address,
             amount = amount,
         )
-        Transaction.INDEX += 1
-        self.current_transactions.append(tx)
-        return tx
         
-# 1. sender는 이전 tx을 해쉬에 넣어 previous_tx_hash를 만든다
-# 2. recipient address, amout를 적는다.
-# 3. sender priv key를 넣고 enc_msg에 digital signature를 남긴다.
-# 4. recipient는 sender의 public key를 넣고 digital signature가 진본임을 확인한다.
+        try:
+            self.verify_transaction(tx)
+            Transaction.INDEX += 1
+            self.current_transactions.append(tx)
+            
+            return tx
+        except:
+            raise ValueError("invalid transaction")
+
     def new_node(self, nickname):
         nickname = nickname
         node = Node(nickname)
@@ -136,3 +154,5 @@ junu = blockchain.new_node('junu')
 kim = blockchain.new_node('kim')
 blockchain.new_transaction(junu, kim.public_key, 3)
 blockchain.new_block()
+
+# >> key = RSA.import_key(json.loads(blockchain.chain[1].transactions[0].msg)['recipient_address'].encode())
