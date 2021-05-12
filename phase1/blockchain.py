@@ -154,5 +154,3 @@ junu = blockchain.new_node('junu')
 kim = blockchain.new_node('kim')
 blockchain.new_transaction(junu, kim.public_key, 3)
 blockchain.new_block()
-
-# >> key = RSA.import_key(json.loads(blockchain.chain[1].transactions[0].msg)['recipient_address'].encode())

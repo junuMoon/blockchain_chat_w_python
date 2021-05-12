@@ -1,15 +1,29 @@
 <html>
   <head>
-    <title>Green Coin</title>
-    <link rel="stylesheet" href="../static/style.css">
+    <title>Coin</title>
   </head>
   <body>
-    <div class="center">
-      <p class="logo-txt">Green Code</p>
-    </div>
-    <div>
-      <input value="You can't unring the bell">
-    </div>
-    <!-- TODO: input -->
+  <h1>Coin explorer</h1>
+  <hr>
+  <div>
+    <p>blocks</p>
+    <ul>
+      {% for block in blocks %}
+        {% if block == block_hash %}
+          <li><b><a href={{ url_for('index_block', block_hash=block) }}>{{ block }}</a></b></li>
+        {% else %}
+          <li><a href={{ url_for('index_block', block_hash=block) }}>{{ block }}</a></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </div>
+  <div>
+    <p>transactions</p>
+    <ul>
+      {% for tx in transactions %}
+      <li> {{ tx }} </li>
+      {% endfor %}
+    </ul>
+  </div>
   </body>
-</html>
+</html> 
