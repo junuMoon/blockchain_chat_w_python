@@ -199,16 +199,21 @@ def mine():
 def submit_transaction():
     # "You can't unring the bell"
     if request.method == "GET":
-        return render_template('new_transaction')
+        address = list()
+        for node in blockchain.nodes:
+            address.append(binascii.hexlify(node.public_key.export_key('OpenSSH')).decode())
+        return render_template('transaction.html', address=address)
+    
     elif request.method == "POST":
-        recipient_address = request.form['recipient_address']
+        recipient_address = request.form['recipient-address']
+        recipient_address = RSA.import_key(binascii.unhexlify(recipient_address.encode()))
         amount = request.form['amount']
         
         blockchain.new_transaction(
             recipient_address=recipient_address,
             amount=amount)
         
-        redirect('index')
+        return redirect(url_for('index'))
     
 
 if __name__ == '__main__':
