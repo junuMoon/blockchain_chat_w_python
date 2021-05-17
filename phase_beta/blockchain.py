@@ -1,7 +1,7 @@
 import hashlib
 import uuid
 from datetime import datetime
-
+from collections import OrderedDict
 
 class Blockchain(object):
     
@@ -48,13 +48,15 @@ class Blockchain(object):
             
         transactions = self.current_transactions
         reward_transaction = self.new_transaction(
-            sender_address = "None",  # FIXME: none != null
+            sender_address = "None",
             recipient_address = node_address,
-            amount = 10, # FIXME: need int but get str from form data
+            amount = 10,
             reward=True
         )
         transactions.insert(0, reward_transaction)
         self._transaction_indexing(transactions)
+        
+        transactions = [OrderedDict(sorted(transaction.items())) for transaction in transactions] 
             
         block = {
             'index': len(self.chain),
@@ -64,6 +66,7 @@ class Blockchain(object):
             'nonce': _nonce,
             'transactions': transactions
         }
+        block = OrderedDict(sorted(block.items()))
         
         self.chain.append(block)
         self.current_transactions = list()
@@ -111,6 +114,24 @@ class Blockchain(object):
     @property
     def last_block(self):
         return self.chain[-1]
+    
+    def replace_chain(self, new_chain):
+        chain = list()
+
+        for block in new_chain:
+            block = OrderedDict(sorted(block.items()))
+            txs = list()
+            
+            for tx in block.get('transactions'):
+                tx = OrderedDict(sorted(tx.items()))
+                txs.append(tx)
+            
+            block['transactions'] = txs
+            chain.append(block)
+
+        self.chain = chain
+        
+        return chain
 
         
 # blockchain = Blockchain()
