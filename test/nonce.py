@@ -116,38 +116,3 @@ class Blockchain(object):
 
         
 blockchain = Blockchain()
-
-blockchain.chain = [
-    {
-      "index": 0,
-      "miner": "50fd02d7-f3fa-4487-b868-ac00732bcc10",
-      "nonce": 35293,
-      "previous_hash": "0000c415de5ceea33c02daa85a1c218ecca1b1c9e9864ed34d183597844de8e2",
-      "timestamp": "2021-05-17 14:54:58",
-      "transactions": [
-        {
-          "amount": 10,
-          "index": 0,
-          "recipient_address": "50fd02d7-f3fa-4487-b868-ac00732bcc10",
-          "sender_address": "None",
-          "timestamp": "2021-05-17 14:54:58"
-        }
-      ]
-    },
-    {
-      "index": 1,
-      "miner": "50fd02d7-f3fa-4487-b868-ac00732bcc10",
-      "nonce": 155220,
-      "previous_hash": "0000aae78315017d8a33857f28dcaea56046d53ed1c1f98413e7037f9f0102c4",
-      "timestamp": "2021-05-17 14:55:03",
-      "transactions": [
-        {
-          "amount": 10,
-          "index": 0,
-          "recipient_address": "50fd02d7-f3fa-4487-b868-ac00732bcc10",
-          "sender_address": "None",
-          "timestamp": "2021-05-17 14:55:03"
-        }
-      ]
-    }
-  ]

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from blockchain import Blockchain
 from flask import (Flask, json, request, render_template, redirect, url_for, jsonify, make_response)
 import requests
@@ -111,33 +112,12 @@ def accept_node():
 @app.route('/nodes/chain/', methods=['GET'])
 def get_chain():
     if blockchain.valid_chain(blockchain.chain):
-        # response = make_response(json.dumps(blockchain.chain) #FIXME: json encoding 문제로 인한 valid chain 오류
-        print('orig', blockchain.chain)
         return {'chain': blockchain.chain, 'code': 200}
     
     else:
-        
         message = "no valid chain"
         return {'chain': [], 'message': message, 'code': 204}
-    
-    
-@app.route('/nodes/chain/test', methods=['GET'])
-def test_get_chain():
 
-    print('1', blockchain.valid_chain(blockchain.chain))
-    print('test', blockchain.chain)
-    json_chain = requests.get(f'http://{blockchain.root_node.get("ip_address")}/nodes/chain').json().get('chain')
-
-    if json_chain == blockchain.chain:
-        print('2', blockchain.valid_chain(json_chain))
-        
-        return {'chain': blockchain.chain}
-    else:
-        msg = 'False'
-        
-        return msg
-
-                              
 
 @app.route('/nodes/resolve', methods=['GET'])
 def consensus():
@@ -146,17 +126,10 @@ def consensus():
     for node in blockchain.nodes:
 
         ip_address = node.get('ip_address')
-        chain = requests.get(f"http://{ip_address}/nodes/chain/")
+        new_chain = requests.get(f"http://{ip_address}/nodes/chain/").json().get('chain')
         
-        print('1', chain.json().get('chain'))
-        chain =  chain.json().get('chain')
-        # print('1-1', chain.json().get('message'))
-        # print('1-1', chain.json().get('chain'))
-        # chain = chain.json().get('chain')
-        # chain = response.json()
-        
-        if len(chain) > len(blockchain.chain):
-            blockchain.chain = chain
+        if len(new_chain) > len(blockchain.chain):
+            blockchain.replace_chain(new_chain)
         
             msg = f"Our chain was replaced with chain of {node}"
 
