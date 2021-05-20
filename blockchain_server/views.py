@@ -1,20 +1,34 @@
-from collections import OrderedDict
-from blockchain import Blockchain
-from flask import (Flask, json, request, render_template, redirect, url_for, jsonify, make_response)
-import requests
 import sys
+from collections import OrderedDict
 
+import requests
+from flask import Flask, jsonify, redirect, render_template, request, url_for, Blueprint
+from flask_sqlalchemy import SQLAlchemy
+
+from blockchain_server.blockchain import Blockchain
+from blockchain_server import db
+from blockchain_server.models import Example
+
+
+# PORT = sys.argv[1]
+PORT = 5000
 
 blockchain = Blockchain()
-
-PORT = sys.argv[1]
-
 blockchain.root_node['ip_address'] = '127.0.0.1:'+str(PORT)
 
-app = Flask(__name__)
+bp = Blueprint('views', __name__)
 
 
-@app.route('/', methods=['GET'])
+@bp.route('/test')
+def test():
+    ex1 = Example(data='junu')
+    db.session.add(ex1)
+    db.session.commit()
+    
+    return ex1.data
+
+
+@bp.route('/', methods=['GET'])
 def index():
     transactions = blockchain.current_transactions
     blocks = [block.get('previous_hash') for block in blockchain.chain]
@@ -22,7 +36,7 @@ def index():
     return render_template('index.html', blocks=blocks, transactions=transactions)
 
 
-@app.route('/blocks/<string:block_hash>/', methods=['GET'])
+@bp.route('/blocks/<string:block_hash>/', methods=['GET'])
 def index_block(block_hash):
     blocks = [block.get('previous_hash') for block in blockchain.chain]
 
@@ -34,15 +48,15 @@ def index_block(block_hash):
     return render_template('index.html', blocks=blocks, block_hash=block_hash, transactions=transactions)
 
 
-@app.route('/blocks/mine/', methods=['GET'])
+@bp.route('/blocks/mine/', methods=['GET'])
 def mine():
     block_hash = blockchain.new_block(blockchain.root_node['address']).get('previous_hash')
     message = 'New block is created.'
     
-    return redirect(url_for('index_block', block_hash=block_hash))
+    return redirect(url_for('views.index_block', block_hash=block_hash))
 
 
-@app.route('/transactions/new', methods=['GET', 'POST'])
+@bp.route('/transactions/new', methods=['GET', 'POST'])
 def submit_transaction():
     if request.method == 'GET':
         address = [node['address'] for node in blockchain.nodes]
@@ -59,10 +73,10 @@ def submit_transaction():
             amount = amount
         )
         
-        return redirect(url_for('index'))
+        return redirect(url_for('views.index'))
     
     
-@app.route('/nodes/register', methods=['POST'])
+@bp.route('/nodes/register', methods=['POST'])
 def register_node():
     new_node_ip = request.get_json().get('ip_address')
     
@@ -82,7 +96,7 @@ def register_node():
     return jsonify(new_node_ip), 201
 
 
-@app.route('/nodes/accept/', methods=['POST'])
+@bp.route('/nodes/accept/', methods=['POST'])
 def accept_node():
     
     try:
@@ -109,7 +123,7 @@ def accept_node():
     return jsonify(message)
     
 
-@app.route('/nodes/chain/', methods=['GET'])
+@bp.route('/nodes/chain/', methods=['GET'])
 def get_chain():
     if blockchain.valid_chain(blockchain.chain):
         return {'chain': blockchain.chain, 'code': 200}
@@ -119,7 +133,7 @@ def get_chain():
         return {'chain': [], 'message': message, 'code': 204}
 
 
-@app.route('/nodes/resolve', methods=['GET'])
+@bp.route('/nodes/resolve', methods=['GET'])
 def consensus():
     msg = f"Our chain is authoritative"
     
@@ -135,6 +149,3 @@ def consensus():
 
     return jsonify(msg), 201
 
-
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=PORT, debug=True)
