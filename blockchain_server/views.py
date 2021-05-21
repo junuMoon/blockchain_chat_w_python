@@ -1,9 +1,9 @@
+from blockchain_server.utils import stringfy_block_hash
 import sys
 from collections import OrderedDict
 
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for, Blueprint
-from flask_sqlalchemy import SQLAlchemy
 
 from blockchain_server.blockchain import Blockchain
 from blockchain_server import db
@@ -59,6 +59,13 @@ def test_new_block():
     db.session.commit()
     
     return new_block.to_dict()
+
+@bp.route('/test/', methods=['GET'])
+def test_index():
+    transactions = db.session.query(Transaction).filter(Transaction.added_to_block == 0).all()
+    blocks = [str(b).split("'")[1] for b in db.session.query(Block.previous_hash).all()]
+
+    return render_template('index.html', blocks=blocks, transactions=transactions)
     
 
 @bp.route('/', methods=['GET'])
@@ -69,7 +76,16 @@ def index():
     return render_template('index.html', blocks=blocks, transactions=transactions)
 
 
-@bp.route('/blocks/<string:block_hash>/', methods=['GET'])
+@bp.route('/test/blocks/<string:block_hash>', methods=['GET'])
+def test_index_block(block_hash):
+    blocks = [b.previous_hash for b in db.session.query(Block).order_by(Block.index).all()]
+    b = db.session.query(Block).filter(Block.previous_hash == block_hash).first()
+        
+    transactions = [tx.to_dict() for tx in b.transactions]
+    return render_template('index.html', blocks=blocks, block_hash=block_hash, transactions=transactions)
+
+
+@bp.route('/blocks/<string:block_hash>', methods=['GET'])
 def index_block(block_hash):
     blocks = [block.get('previous_hash') for block in blockchain.chain]
 
@@ -79,6 +95,34 @@ def index_block(block_hash):
             
     transactions = block['transactions']
     return render_template('index.html', blocks=blocks, block_hash=block_hash, transactions=transactions)
+
+
+@bp.route('/test/blocks/mine/', methods=['GET'])
+def test_mine():
+    last_block = db.session.query(Block).order_by(Block.index.desc()).first()
+    _hash, _nonce = last_block._proof_of_work()
+    
+    new_block = Block(previous_hash=_hash, miner='Junu', nonce=_nonce) #TODO: get miner from request
+    print(new_block.previous_hash)
+    txs = db.session.query(Transaction)\
+        .filter(Transaction.added_to_block == False)\
+            .order_by(Transaction.timestamp).all()
+            
+    transactions = list()
+    for i, tx in enumerate(txs):
+        tx.index = i
+        tx.added_to_block = True
+        tx.block = new_block
+        tx.block_hash = new_block.previous_hash
+        transactions.append(tx)
+        db.session.add(tx)
+        
+    new_block.transactions = transactions
+    new_block.index = last_block.index + 1
+    db.session.add(new_block)
+    db.session.commit()
+
+    return redirect(url_for('views.test_index_block', block_hash=new_block.previous_hash))
 
 
 @bp.route('/blocks/mine/', methods=['GET'])

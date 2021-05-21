@@ -1,4 +1,4 @@
-### Flask-migration
+### Flask-db
 migrations/
 
 ### private file
@@ -134,3 +134,6 @@ pip-selfcheck.json
 # Ignore all local history of files
 .history
 .ionide
+blockchain_server/blockchain_test2.db
+blockchain_server/blockchain_test2.db
+blockchain_server/blockchain_test2.db

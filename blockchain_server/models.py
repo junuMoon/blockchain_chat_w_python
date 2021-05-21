@@ -2,7 +2,6 @@ from sqlalchemy.orm import backref, relationship
 from blockchain_server import db
 from datetime import datetime
 import hashlib
-import uuid
 
 
 class Transaction(db.Model):
@@ -46,7 +45,6 @@ class Transaction(db.Model):
     def __hash__(self):
         d = self.to_dict()
         _hash = hashlib.sha256(str(d).encode()).hexdigest()
-        print(_hash)
         
         return _hash
     
@@ -63,7 +61,6 @@ class Block(db.Model):
     index = db.Column(db.Integer) #FIXME: unique constraint #FIXME: auto_increment
     miner = db.Column(db.String(100), nullable=False)
     nonce = db.Column(db.Integer)
-    chain = db.Column(db.String(30), db.ForeignKey('chain.id'))
     
     def __repr__(self):
         return f"block<{self.index}: {self.previous_hash}"
@@ -76,7 +73,7 @@ class Block(db.Model):
     def to_dict(self):
         d = {
             'previous_hash': self.previous_hash,
-            'timestamp': self.timestamp,
+            'timestamp': self.timestamp, #TODO: strptime
             'miner': self.miner,
             'nonce': self.nonce,
             'transactions': [tx.to_dict() for tx in self.transactions]
