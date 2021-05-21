@@ -1,3 +1,6 @@
+### Flask-migration
+migrations/
+
 ### private file
 test/*
 *.key

@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from blockchain_server.blockchain import Blockchain
 from blockchain_server import db
-from blockchain_server.models import Example
+from blockchain_server.models import Transaction, Block
 
 
 # PORT = sys.argv[1]
@@ -19,14 +19,47 @@ blockchain.root_node['ip_address'] = '127.0.0.1:'+str(PORT)
 bp = Blueprint('views', __name__)
 
 
-@bp.route('/test')
-def test():
-    ex1 = Example(data='junu')
-    db.session.add(ex1)
+@bp.route('/test/new_transaction')
+def test_new_transaction():
+    tx1 = Transaction(sender='Jong-min', recipient='you-kyoung', amount=1)
+    tx2 = Transaction(sender='Jong-min', recipient='you-kyoung', amount=2)
+    tx3 = Transaction(sender='Jong-min', recipient='you-kyoung', amount=3)
+    
+    
+    db.session.add(tx1)
+    db.session.add(tx2)
+    db.session.add(tx3)
     db.session.commit()
     
-    return ex1.data
+    return tx1.__repr__()
 
+@bp.route('/test/new_block')
+def test_new_block():
+    last_block = db.session.query(Block).order_by(Block.index.desc()).first()
+    _hash, _nonce = last_block._proof_of_work()
+    
+    new_block = Block(previous_hash=_hash, miner='Junu', nonce=_nonce)
+    
+    txs = db.session.query(Transaction)\
+        .filter(Transaction.added_to_block == False)\
+            .order_by(Transaction.timestamp).all()
+            
+    transactions = list()
+    for i, tx in enumerate(txs):
+        tx.index = i
+        tx.added_to_block = True
+        tx.block = new_block
+        tx.block_hash = new_block.previous_hash
+        transactions.append(tx)
+        db.session.add(tx)
+        
+    new_block.transactions = transactions
+    new_block.index = last_block.index + 1
+    db.session.add(new_block)
+    db.session.commit()
+    
+    return new_block.to_dict()
+    
 
 @bp.route('/', methods=['GET'])
 def index():
