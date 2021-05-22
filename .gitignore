@@ -1,3 +1,7 @@
+# db
+/migrations
+*.db
+
 ### private file
 test/*
 *.key
