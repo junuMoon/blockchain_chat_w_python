@@ -1,11 +1,21 @@
-from sqlalchemy.orm import backref, relationship
-from blockchain_server import db
-from datetime import datetime
 import hashlib
+from datetime import datetime
 
+from sqlalchemy.orm import relationship
+
+from .. import db
+
+
+class Node(db.Model):
+    __tablename__ = 'node'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String)
+    address = db.Column(db.String(64))
 
 class Transaction(db.Model):
     __tablename__ = 'transaction'
+    REWARD = 10
     
     hash = db.Column(db.String(64), primary_key=True)
     index = db.Column(db.String)
@@ -48,12 +58,34 @@ class Transaction(db.Model):
         
         return _hash
     
-    #TODO: reward transaction
+    @staticmethod
+    def _reward_transaction(block):
+        tx = Transaction(
+                sender=block.miner,
+                recipient=block.miner,
+                amount=Transaction.REWARD,
+                )
+        return tx
     
+    @classmethod
+    def txs_to_block(cls, block):
+        txs = db.session.query(cls).filter(cls.added_to_block == False).order_by(cls.timestamp).all()
+        txs.insert(0, cls._reward_transaction(block))
+        
+        for i, tx in enumerate(txs):
+            tx.index = i
+            tx.added_to_block = True
+            tx.block = block
+            tx.block_hash = block.previous_hash
+        
+        return txs
+        
 
-MINE_DIFFICULTY = 4
+
 
 class Block(db.Model):
+    MINE_DIFFICULTY = 4
+    FIRST_NONCE = 100
     __tablenames__ = 'block'
     
     previous_hash = db.Column(db.String(64), primary_key=True)
@@ -89,19 +121,21 @@ class Block(db.Model):
         
         return _hash
 
-    def _proof_of_work(self):
+    @staticmethod
+    def _proof_of_work(block):
         nonce = 0
         
         while True:
-            _hash = self.__hash__(nonce)
-            if _hash[:MINE_DIFFICULTY] == "0"*MINE_DIFFICULTY:
+            _hash = block.__hash__(nonce)
+            if _hash[:Block.MINE_DIFFICULTY] == "0"*Block.MINE_DIFFICULTY:
                 break
             else:
                 nonce += 1
                 
         return _hash, nonce
 
-    #TODO: genesis block
+        
+        
     #TODO: valid chain/block
 
 
