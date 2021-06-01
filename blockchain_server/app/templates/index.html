@@ -5,14 +5,15 @@
   <body>
   <h1><a href={{ url_for('.index')}}>Coin explorer</a></h1>
   <hr>
+  <p>your address: {{ ip_address }} - {{ address }}</p>
   <div>
     <p>blocks</p>
     <ul>
       {% for block in blocks %}
-        {% if block == block_hash %}
-          <li><b><a href={{ url_for('.index_block', block_hash=block) }}>{{ block }}</a></b></li>
+        {% if block == target_block_hash %}
+          <li><b><a href={{ url_for('.index', hash_id=block) }}>{{ block }}</a></b></li>
         {% else %}
-          <li><a href={{ url_for('.index_block', block_hash=block) }}>{{ block }}</a></li>
+          <li><a href={{ url_for('.index', hash_id=block) }}>{{ block }}</a></li>
         {% endif %}
       {% endfor %}
     </ul>

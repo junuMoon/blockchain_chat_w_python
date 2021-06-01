@@ -23,6 +23,7 @@ date: 2021.05.31
 
 - Transaction calculate
 - Valid Chain
+  - \__eq__
 - Broadcasting
 - Asynchronous way of Connection between nodes
   - exception handling
@@ -36,6 +37,10 @@ date: 2021.05.31
 
 - Synchronization cronjob between nodes
 - Multi-threading for user
+
+### API
+
+- db init
 
 ## Priorities
 
