@@ -8,7 +8,11 @@ from .. import db
 from .models import Block, Transaction, Node
 from . import main
 
-
+CONN_NODES_NUM = 2
+CONN_NODES = set()
+CONN_NODES_SEAT = CONN_NODES_NUM - len(CONN_NODES)
+MY_IP = ''
+MY_ADDRESS = ''
 
 def generate_genesis_block():
     if not db.session.query(Block).first():
@@ -39,12 +43,6 @@ def generate_genesis_block():
 
 @main.route('/', methods=['GET'])
 def index():
-    try:
-        ip_address=session['node-ip-address']
-        address=session['node-address']
-    except KeyError:
-        return redirect(url_for('.node_register'))
-    
     hash_id = request.args.get('hash_id')
     blocks = [b.previous_hash for b in db.session.query(Block).order_by(Block.index.desc()).all()]
     if hash_id:
@@ -55,14 +53,14 @@ def index():
         transactions = db.session.query(Transaction).filter(Transaction.added_to_block == 0).all()
     
     #TODO: valid chain
-    
+
     return render_template('index.html', 
                            blocks=blocks,
                            target_block_hash = hash_id,
                            transactions=transactions,
-                           nodes=CONNECT_NODES, #TODO use flask g
-                           ip_address=ip_address,
-                           address=address)
+                           nodes=CONN_NODES, #TODO use flask g
+                           ip_address=MY_IP,
+                           address=MY_ADDRESS)
 
 
 @main.route('/blocks/mine/', methods=['GET'])
@@ -76,7 +74,7 @@ def mine():
     _hash, _nonce = Block._proof_of_work(last_block)
     
     new_block = Block(previous_hash=_hash,
-                      miner=session['node-address'],
+                      miner=MY_ADDRESS,
                       nonce=_nonce)
     
     txs = Transaction.txs_to_block(new_block)
@@ -117,28 +115,27 @@ def submit_transaction():
         return redirect(url_for('.index'))
     
 
-CONNECT_NODES_NUM = 5
-CONNECT_NODES = list()
-CONNECT_NODES_SEAT = CONNECT_NODES_NUM - len(CONNECT_NODES)
-
-g['CONNECT_NODES_NUM'] = 5
-g['CONNECT_NODES'] = [[] for i in range(g['CONNECT_NODES_NUM'])]
-
 @main.before_app_request
 def node_session():
-    if session.get('node-ip-address'): # check if session has ip address
-        pass
+    global MY_IP
+    global MY_ADDRESS
     
-    elif not session.get('node-ip-address') and request.endpoint != 'main.node_register': # check if db has ip address and store it on session
+    if MY_IP: # check if session has ip address
+        if request.endpoint == 'main.node_register':
+            return redirect(url_for('.index'))
+        
+    else:
         node = db.session.query(Node).filter(Node.ip_address=='127.0.0.1:'+current_app.config['PORT']).first()
         if node:
-            session['node-ip-address'] = node.ip_address
-            session['node-address'] = node.address
+            MY_IP = node.ip_address
+            MY_ADDRESS = node.address
+            if request.endpoint == 'main.node_register':
+                return redirect(url_for('.index'))
+                
         else:
-            return redirect(url_for('.node_register'))
-
-    elif not session.get('node-ip-address') and request.endpoint == 'main.node_register': # redirect to node register
-        pass
+            if request.endpoint != 'main.node_register':
+                return redirect(url_for('.node_register'))
+            
     
 @main.route('/nodes/register', methods=['GET', 'POST'])
 def node_register():
@@ -153,44 +150,60 @@ def node_register():
 
         return redirect(url_for('.index'))
     
-
+import time
 @main.route('/nodes/connect/', methods=['GET', 'POST'])
 def connect_nodes():
     if request.method == 'GET':
-    
-        nodes = db.session.query(Node).filter(Node.ip_address!=session['node-ip-address']).order_by(func.random()).limit(CONNECT_NODES_SEAT).all()
+        # while CONN_NODES_SEAT: #FIXME: concurrency
+        nodes = db.session.query(Node).filter(Node.ip_address!=MY_IP).order_by(func.random()).limit(CONN_NODES_SEAT).all()
+        
+        nodes = set(nodes) - CONN_NODES
+        
         for node in nodes:
+            print(node.ip_address)
             try:
                 #TODO: asynchronous connection
+                #TODO: iter until get 5 connected nodes
+                #TODO: random walk
                 req = requests.post(f"http://{node.ip_address}/nodes/accept/",
                             json={
-                                'ip_address': session['node-ip-address'],
-                                'address': session['node-address']
+                                'ip_address': MY_IP,
+                                'address': MY_ADDRESS
                             })
-                print(req.request.url)
             except Exception as e:
                 message = f"Connection to {node.ip_address} has failed"
                 print(e, message) #TODO: HTTPConnectionPool error handling
                 continue
-        
+            
         return redirect(url_for('.index'))
                 
-    elif request.method == 'POST':
-        if request.get_json().get('status') == 0: #TODO: status zero -> out of seat
-            message = ''
+    if request.method == 'POST':
+        status = request.get_json().get('status')
+        if status == 0: #TODO: status zero -> out of seat
+            message = 'declined: out of seat'
+            return message
         
-        elif request.get_json().get('status') == 1:
+        elif status == 1:
             try:
                 values = request.get_json()
-                
                 new_node_ip_address = values.get('ip_address')
                 new_node = db.session.query(Node).filter(Node.ip_address==new_node_ip_address).first()
-                CONNECT_NODES.append(new_node)
-                return 'dummy string'
+                CONN_NODES.add(new_node)
+                return f'connection between {new_node_ip_address}'   
             except Exception as e:
                 print("wrong", e) #TODO: what wrong
                 return "need handling"
+        
+        # elif status == 2:
+        #     values = request.get_json()
+        #     ip_address = values.get('ip_address')
+        #     for node in CONN_NODES:
+        #         if node.ip_address == ip_address:
+        #             CONN_NODES.remove(node)
+                    
+        #     return 'dummy string2'
             
+                
 # status 0: no seat
 # status 1: good
 # status 2: close server
@@ -202,13 +215,13 @@ def accept_node():
         new_node_address = values.get('address')
         new_node_ip_address = values.get('ip_address')
         dict_4_response_json = {
-                        'ip_address': session['node-ip-address'],
-                        'address': session['node-address'],
+                        'ip_address': MY_IP,
+                        'address': MY_ADDRESS,
                         }
         
-        if not CONNECT_NODES_SEAT:
+        if not CONN_NODES_SEAT:
             dict_4_response_json['status'] = 0
-            dict_4_response_json['message'] = f"{session['node-ip-address']} is out of seat."
+            dict_4_response_json['message'] = f"{MY_IP} is out of seat."
             response = requests.post(f"http://{new_node_ip_address}/nodes/connect/",
                                      json=dict_4_response_json)
             return dict_4_response_json['message']
@@ -219,10 +232,10 @@ def accept_node():
                 new_node = Node(ip_address=new_node_ip_address, address=new_node_address)
                 db.session.add(new_node)
                 db.session.commit()
-            CONNECT_NODES.append(new_node)
+            CONN_NODES.add(new_node) #FIXME: not db instance -> 
             
             dict_4_response_json['status'] = 1
-            dict_4_response_json['message'] = f"Connections between {session['node-ip-address']} - {new_node_ip_address} has been established."
+            dict_4_response_json['message'] = f"Connections between {MY_IP} - {new_node_ip_address} has been established."
             response = requests.post(f"http://{new_node_ip_address}/nodes/connect/",
                                      json=dict_4_response_json)
             return dict_4_response_json['message']
@@ -230,19 +243,6 @@ def accept_node():
     except Exception as e:
         print(e)
         return f"Error occurred: {e}"
-
-
-def tear_down():
-    for node in CONNECT_NODES:
-        response = requests.post(f"http://{node.ip_address}/nodes/connect/",
-                json={
-                    'status': 2,
-                    'ip_address': session['node-ip-address'],
-                    'address': session['node-address'],
-                    'message': "{session['node-ip-address']} has left the server."
-                })
-        return response
-
 
 # @main.route('/nodes/chain/', methods=['GET'])
 # def get_chain():
