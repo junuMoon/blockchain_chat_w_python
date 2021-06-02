@@ -3,6 +3,8 @@ from datetime import datetime
 
 from sqlalchemy.orm import relationship
 
+from dataclasses import dataclass
+
 from .. import db
 
 
@@ -12,6 +14,12 @@ class Node(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String)
     address = db.Column(db.String(64))
+    
+    def __str__(self):
+        return f"{self.ip_address} : {self.address}"
+    
+    def __repr__(self):
+        return f"{self.ip_address} : {self.address}"
 
 class Transaction(db.Model):
     __tablename__ = 'transaction'

@@ -1,3 +1,4 @@
+import imp
 from flask import redirect, render_template, request, url_for, session, current_app, g
 
 import requests
@@ -6,61 +7,35 @@ from sqlalchemy.sql.expression import func
 
 from .. import db
 from .models import Block, Transaction, Node
+from .utils import generate_genesis_block, valid_chain
 from . import main
 
-CONN_NODES_NUM = 2
-CONN_NODES = set()
+CONN_NODES_NUM = current_app.config['CONN_NODES_NUM']
+CONN_NODES = set() #TODO: collections.deque
 CONN_NODES_SEAT = CONN_NODES_NUM - len(CONN_NODES)
 MY_IP = ''
 MY_ADDRESS = ''
-
-def generate_genesis_block():
-    if not db.session.query(Block).first():
-        
-        block = Block(
-            index=0,
-            miner=session['node-address']
-            )
-        
-        _hash, _nonce = Block._proof_of_work(block)
-        
-        block.previous_hash = _hash
-        block.nonce = _nonce
-        txs = Transaction.txs_to_block(block)
-        block.transactions = txs
-        
-        db.session.add_all(txs)
-        db.session.add(block)
-        db.session.commit()
-        
-        print("genesis block created.")
-        
-        return block
-    
-    else:
-        pass
     
 
 @main.route('/', methods=['GET'])
 def index():
-    hash_id = request.args.get('hash_id')
-    blocks = [b.previous_hash for b in db.session.query(Block).order_by(Block.index.desc()).all()]
-    if hash_id:
-        b = db.session.query(Block).filter(Block.previous_hash == hash_id).first()
-        transactions = [tx.to_dict() for tx in b.transactions]
-        
-    else:
-        transactions = db.session.query(Transaction).filter(Transaction.added_to_block == 0).all()
-    
-    #TODO: valid chain
+    if valid_chain().get('valid'):
+        hash_id = request.args.get('hash_id')
+        blocks = [b.previous_hash for b in db.session.query(Block).order_by(Block.index.desc()).all()]
+        if hash_id:
+            b = db.session.query(Block).filter(Block.previous_hash == hash_id).first()
+            transactions = [tx.to_dict() for tx in b.transactions]
+            
+        else:
+            transactions = db.session.query(Transaction).filter(Transaction.added_to_block == 0).all()
 
-    return render_template('index.html', 
-                           blocks=blocks,
-                           target_block_hash = hash_id,
-                           transactions=transactions,
-                           nodes=CONN_NODES, #TODO use flask g
-                           ip_address=MY_IP,
-                           address=MY_ADDRESS)
+        return render_template('index.html', 
+                            blocks=blocks,
+                            target_block_hash = hash_id,
+                            transactions=transactions,
+                            nodes=CONN_NODES,
+                            ip_address=MY_IP,
+                            address=MY_ADDRESS)
 
 
 @main.route('/blocks/mine/', methods=['GET'])
@@ -150,17 +125,18 @@ def node_register():
 
         return redirect(url_for('.index'))
     
-import time
+
 @main.route('/nodes/connect/', methods=['GET', 'POST'])
 def connect_nodes():
     if request.method == 'GET':
         # while CONN_NODES_SEAT: #FIXME: concurrency
-        nodes = db.session.query(Node).filter(Node.ip_address!=MY_IP).order_by(func.random()).limit(CONN_NODES_SEAT).all()
+        ips = [node.ip_address for node in CONN_NODES]
+        ips.append(MY_IP)
+        nodes = db.session.query(Node).filter(Node.ip_address.not_in(ips)).order_by(func.random()).limit(CONN_NODES_SEAT).all()
         
         nodes = set(nodes) - CONN_NODES
         
         for node in nodes:
-            print(node.ip_address)
             try:
                 #TODO: asynchronous connection
                 #TODO: iter until get 5 connected nodes
@@ -193,16 +169,6 @@ def connect_nodes():
             except Exception as e:
                 print("wrong", e) #TODO: what wrong
                 return "need handling"
-        
-        # elif status == 2:
-        #     values = request.get_json()
-        #     ip_address = values.get('ip_address')
-        #     for node in CONN_NODES:
-        #         if node.ip_address == ip_address:
-        #             CONN_NODES.remove(node)
-                    
-        #     return 'dummy string2'
-            
                 
 # status 0: no seat
 # status 1: good
@@ -228,6 +194,7 @@ def accept_node():
         
         else:
             new_node = db.session.query(Node).filter(Node.ip_address==new_node_ip_address).first()
+            print('from', new_node)
             if not new_node:
                 new_node = Node(ip_address=new_node_ip_address, address=new_node_address)
                 db.session.add(new_node)
@@ -244,29 +211,37 @@ def accept_node():
         print(e)
         return f"Error occurred: {e}"
 
-# @main.route('/nodes/chain/', methods=['GET'])
-# def get_chain():
-#     if blockchain.valid_chain(blockchain.chain):
-#         return {'chain': blockchain.chain, 'code': 200}
+
+@main.route('/nodes/chain', methods=['GET'])
+def get_chain():
+    try:
+        inspection = valid_chain()
+        if inspection.get('valid'):
+            return inspection.get('chain')
+        else:
+            return "Invalid Chain"
+    except KeyError:
+        print(KeyError)
+        return "Error occurred"
     
-#     else:
-#         message = "no valid chain"
-#         return {'chain': [], 'message': message, 'code': 204}
 
+@main.route('/nodes/resolve', methods=['GET'])
+def consensus():
+    chain = db.session.query(Block).order_by(Block.id.asc()).all()
+    for node in CONN_NODES:
+        try:
+            response = requests.get(f"http://{node.ip_address}/nodes/chain")
+            new_chain = response.json().get('chain')
 
-# @main.route('/nodes/resolve', methods=['GET'])
-# def consensus():
-#     msg = f"Our chain is authoritative"
-    
-#     for node in blockchain.nodes:
-
-#         ip_address = node.get('ip_address')
-#         new_chain = requests.get(f"http://{ip_address}/nodes/chain/").json().get('chain')
+        except AttributeError:
+            msg = f"{node.ip_address} chain is invalid"
+            continue
         
-#         if len(new_chain) > len(blockchain.chain):
-#             blockchain.replace_chain(new_chain)
-        
-#             msg = f"Our chain was replaced with chain of {node}"
-
-#     return jsonify(msg), 201
-
+        if len(chain) < len(new_chain):
+            db.session.query(Block).delete()
+            db.session.add_all(new_chain)
+            db.session.commit()
+            
+            msg = f"Our chain was replaced with chain of {node}"
+            
+    return redirect(url_for('.index'))
