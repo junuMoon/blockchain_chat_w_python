@@ -1,6 +1,8 @@
-# db
-/migrations
+
+### Flask-db
+migrations/
 *.db
+*.sqlite3
 
 ### private file
 test/*
