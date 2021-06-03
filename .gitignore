@@ -1,6 +1,7 @@
 #untrack subdirs
 blockchain_chat/
 phase1/
+Flask-SocketIO-Chat/
 
 ### Flask-db
 migrations/
