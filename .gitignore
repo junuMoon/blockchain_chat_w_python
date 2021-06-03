@@ -1,3 +1,6 @@
+#untrack subdirs
+blockchain_chat/
+phase1/
 
 ### Flask-db
 migrations/
