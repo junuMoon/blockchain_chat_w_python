@@ -1,5 +1,5 @@
 from .. import db
-from .models import Block
+from .models import Block, Transaction
 
 def valid_chain(func=None):
     chain = db.session.query(Block).order_by(Block.index.asc()).all()
@@ -17,12 +17,12 @@ def valid_chain(func=None):
     return response
 
         
-def generate_genesis_block():
+def generate_genesis_block(address):
     if not db.session.query(Block).first():
         
         block = Block(
             index=0,
-            miner=MY_ADDRESS
+            miner=address
             )
         
         _hash, _nonce = Block._proof_of_work(block)

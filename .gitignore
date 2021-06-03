@@ -5,7 +5,7 @@ migrations/
 *.sqlite3
 
 ### private file
-test/*
+test/
 *.key
 phase1/*
 

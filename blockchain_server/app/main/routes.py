@@ -1,14 +1,14 @@
-import imp
-from flask import redirect, render_template, request, url_for, session, current_app, g
+from functools import reduce
 
 import requests
-
+from flask import (current_app, g, redirect, render_template, request, session,
+                   url_for)
 from sqlalchemy.sql.expression import func
 
 from .. import db
-from .models import Block, Transaction, Node
-from .utils import generate_genesis_block, valid_chain
 from . import main
+from .models import Block, Node, Transaction
+from .utils import generate_genesis_block, valid_chain
 
 CONN_NODES_NUM = current_app.config['CONN_NODES_NUM']
 CONN_NODES = set() #TODO: collections.deque
@@ -23,8 +23,8 @@ def index():
         hash_id = request.args.get('hash_id')
         blocks = [b.previous_hash for b in db.session.query(Block).order_by(Block.index.desc()).all()]
         if hash_id:
-            b = db.session.query(Block).filter(Block.previous_hash == hash_id).first()
-            transactions = [tx.to_dict() for tx in b.transactions]
+            block = db.session.query(Block).filter(Block.previous_hash == hash_id).first()
+            transactions = block.transactions
             
         else:
             transactions = db.session.query(Transaction).filter(Transaction.added_to_block == 0).all()
@@ -43,7 +43,7 @@ def mine():
     last_block = db.session.query(Block).order_by(Block.index.desc()).first()
     
     if not last_block:
-        generate_genesis_block()
+        generate_genesis_block(MY_ADDRESS)
         return redirect(url_for('.index'))
         
     _hash, _nonce = Block._proof_of_work(last_block)
@@ -67,7 +67,7 @@ def mine():
 def submit_transaction():
     last_block = db.session.query(Block).order_by(Block.index.desc()).first()
     if not last_block:
-        generate_genesis_block()
+        generate_genesis_block(MY_ADDRESS)
         print("genesis block created.")
         return redirect(url_for('.index'))
         
@@ -76,19 +76,36 @@ def submit_transaction():
         return render_template('new_transaction.html', data=address_list)
     
     elif request.method == 'POST':
-        sender_address = request.form['sender-address']
+        sender_address = MY_ADDRESS
         recipient_address = request.form['recipient-address']
-        amount = int(request.form['amount'])
+        assert sender_address != recipient_address
         
-        new_tx = Transaction(sender=sender_address,
-                             recipient=recipient_address,
-                             amount=amount)
+        amount = int(request.form['amount'])
+        tx_inputs = db.session.query(Transaction)\
+            .filter(Transaction.tx_outputs == None)\
+                .filter(Transaction.recipient==sender_address).all()
+        
+        new_tx = Transaction(recipient=recipient_address,
+                             amount=amount,
+                             tx_inputs=tx_inputs
+                             )
+        
+        balance = reduce(lambda x, y: x+y, [t.amount for t in tx_inputs]) - amount #FIXME: session error
+        balance_tx = balance_transaction(sender_address, balance, tx_inputs)
         
         db.session.add(new_tx)
+        db.session.add(balance_tx)
         db.session.commit()
         
         return redirect(url_for('.index'))
-    
+
+def balance_transaction(sender, balance, tx_inputs):
+    balance_tx = Transaction(
+        recipient = sender,
+        amount = balance,
+        tx_inputs = tx_inputs
+    )
+    return balance_tx
 
 @main.before_app_request
 def node_session():

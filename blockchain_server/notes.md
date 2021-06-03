@@ -1,6 +1,6 @@
 # TODOS
 
-date: 2021.06.01
+date: 2021.06.03
 
 ---
 
@@ -48,13 +48,19 @@ date: 2021.06.01
 
 ## Priorities
 
-1. chaining
+1. Verify Transaction
+2. Packaging
+    1. 앱 시작 시 db 생성 후 create_all
+3. Wallet
+    1. Node
+    2. 공개키/비밀키
+    3. func sign
+4. chaining
     2. valid chain
     3. consensus
     4. chain substitution
-1. 지금 구현되어 있는 것 robust하게 만들기
-    1. genesis block과 세션 노드
+5. network
+    1. CONN_NODES 를 deque로 구현
     2. 서버 종료시 노드 연결 제거 with after app context
-    2. 노드 커넥션 예외 처리
-    3. 블록, tx, 노드 중복 개체 불허
-2. 로거 추가하여 디버깅 용이하게 만들기
+    3. 노드 커넥션 예외 처리
+6. 로거 추가하여 디버깅 용이하게 만들기

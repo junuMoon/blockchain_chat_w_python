@@ -8,7 +8,7 @@ db = SQLAlchemy()
 
 def create_app():
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blockchain_test3.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blockchain_test4.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = "asdkfjh3on3"
     app.config['CONN_NODES_NUM'] = 2
